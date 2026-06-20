@@ -5,13 +5,12 @@ import { X, HelpCircle } from 'lucide-react';
 import './customizacion.css';
 
 const colores = [
-    { id: "blue", name: 'azul', hex: "#3b82f6", lightHex: "#93c5fd" },
-    { id: 'purple', name: 'morado', hex: '#a855f7', lightHex: '#d8b4fe' },
-    { id: 'green', name: 'verde', hex: '#22c55e', lightHex: '#86efac' },
-    { id: 'pink', name: 'rosa', hex: '#ec4899', lightHex: '#f9a8d4' },
-    { id: 'orange', name: 'naranja', hex: '#f97316', lightHex: '#fdba74' },
-    { id: 'agua', name: 'agua', hex: '#14b8a6', lightHex: '#5eead4' },
-
+    { id: "indigo", name: 'Índigo', hex: "#6366f1", lightHex: "#818cf8" },
+    { id: 'violet', name: 'Violeta', hex: "#8b5cf6", lightHex: "#a78bfa" },
+    { id: 'emerald', name: 'Esmeralda', hex: "#10b981", lightHex: "#34d399" },
+    { id: 'rose', name: 'Rosa Neón', hex: "#f43f5e", lightHex: "#fb7185" },
+    { id: 'amber', name: 'Ámbar', hex: "#f59e0b", lightHex: "#fbbf24" },
+    { id: 'cyan', name: 'Cyan', hex: "#06b6d4", lightHex: "#22d3ee" },
 ]
 
 export default function customizacion({ isDark, toggleDark, primaryColor, setPrimaryColor, onClose }) {
