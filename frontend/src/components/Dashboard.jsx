@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Flame, Trophy, CheckCircle, Palette, Trash2, Plus, User, Moon, X, Flag, Calendar, Image as ImageIcon } from 'lucide-react';
+import { Flame, Trophy, CheckCircle, Palette, Trash2, Plus, User, Moon, X, Flag, Calendar, Image as ImageIcon, Settings, Key, LogOut} from 'lucide-react';
 import Customizacion from './customizacion';
 
 function Dashboard({ user, onLogout }) {
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [Editprofile, setIsEditProfile] = useState(false);
+  const [ChangePass, setIsChangePass] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [primaryColor, setPrimaryColor] = useState({ id: 'blue', hex: '#4f46e5', lightHex: '#818cf8' });
 
@@ -208,9 +211,46 @@ function Dashboard({ user, onLogout }) {
             >
               <Plus className="w-4 h-4" /> Nueva Tarea
             </button>
-            <button onClick={onLogout} className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/40 dark:hover:text-red-400 shadow-sm transition-all text-slate-500 dark:text-blue-200 cursor-pointer" title="Cerrar sesión">
-              <User className="w-5 h-5" />
-            </button>
+            <div className='relative'>
+              <button onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className={`p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm transition-all cursor-pointer
+                ${isProfileOpen ? 'bg-slate-100 text-[var(--c_primario)] border-[var(--c_primario)] dark:bg-[#020166] dark:text-blue-300 dark:border-[#0401AD]'
+                : 'hover:bg-slate-50 text-slate-500 dark:text-blue-200 dark:bg-[#01004A] dark:border-[#030188] dark:hover:bg-[#020166]'}`}
+                title='Mi perfil'>
+                <User className='w-5 h-5'/>
+              </button>
+
+              {/* cajita despegable para editar perfil*/}
+              {isProfileOpen && (
+                <div className='absolute right-0 mt-3 w-64 bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200'>
+              
+                {/*Encabezado del nombre y correo del perfil */}
+                <div className='px-4 py-3 bg-slate-50 dark:bg-[#020166] border-b border-slate-100 dark:border-[#030188]'>
+                  <p className='text-sm font-bold text-slate-800 dark:text-blue-50 truncate'>{user?.name || 'Usuario'}</p>
+                  <p className='text-xs font-medium text-slate-500 dark:text-blue-300 truncate'>{user?.email || 'correo@ejemplo.com'}</p>
+                </div>
+              
+              {/*Opciones del Menu */}
+              <div className='p-2 space-y-1'>
+                <button onClick={() => {
+                  setIsEditProfile(true); setIsProfileOpen(false);}}
+                className='w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] hover:text-[var(--c_primario)] rounded-xl transition-colors cursor-pointer'>
+                  <Settings className='w-4 h-4'/>Editar perfil
+                </button>
+                <button onClick={() => {
+                  setIsChangePass(true); setIsProfileOpen(false);}}
+                className='w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] hover:text-[var(--c_primario)] rounded-xl transition-colors cursor-pointer'>
+                  <Key className='w-4 h-4'/>Cambiar contraseña
+                </button>
+                <div className='h-px bg-slate-100 dark:bg-[#030188] my-1 mx-2'></div>
+                <button onClick={onLogout} 
+                className='w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/40 rounded-xl transition-colors cursor-pointer'>
+                  <LogOut className='w-4 h-4'/>Cerrar Sesión
+                </button> 
+              </div>
+          </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -391,7 +431,7 @@ function Dashboard({ user, onLogout }) {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Adjuntar Imagen</label>
-                  {/* 🔥 BOTÓN REAL PARA SUBIR ARCHIVOS */}
+                  {/* BOTÓN REAL PARA SUBIR ARCHIVOS */}
                   <label className="w-full bg-indigo-50 hover:bg-indigo-100 dark:bg-[#020166] dark:hover:bg-[#030188] border border-indigo-200 dark:border-[#030188] rounded-xl px-2 py-2 text-xs font-bold text-[var(--c_primario)] dark:text-blue-300 flex items-center justify-center gap-2 cursor-pointer transition-colors">
                     <ImageIcon className="w-4 h-4" /> 
                     {selectedFile ? 'Cambiar imagen' : 'Seleccionar archivo'}
@@ -426,6 +466,66 @@ function Dashboard({ user, onLogout }) {
               </div>
             </form>
 
+          </div>
+        </div>
+      )}
+
+      {/*Pantalla para editar el perfil*/}
+      {Editprofile && (
+        <div className='fixed inset-0 bg-slate-900/40 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
+          <div className='bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200'>
+            <div className='flex justify-between items-center mb-6'>
+              <h2 className="text-xl font-bold text-slate-800 dark:text-blue-50">Editar Perfil</h2>
+              <button onClick={() => setIsEditProfile(false)}
+              className='text-slate-400 hover:text-slate-600 dark:hover:text-blue-200 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-[#020166] cursor-pointer'>
+                <X className='w-5 h-5'/>
+              </button>
+            </div>
+            <div>
+              <label className='block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1'>Nombre</label>
+              <input type='text' defaultValue={user?.name}
+              className='w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm'/>
+            </div>
+            <div className='flex gap-3 justify-end pt-4 border-t border-slate-100 dark:border-[#030188] mt-6'>
+              <button onClick={() => setIsEditProfile(false)}
+              className='px-5 py-2.5 rounded-xl font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] transition-colors cursor-pointer text-sm'>Cancelar</button>
+              <button onClick={() => {alert("Debemos de corregir la base de datos");
+                setIsEditProfile(false);}}
+                className='bg-[var(--c_primario)] text-white px-5 py-2.5 rounded-xl font-bold hover:opacity-90 shadow-md transition-colors cursor-pointer text-sm'>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/*Cambiar contrase;a*/}
+      {ChangePass && (
+        <div className='fixed inset-0 bg-slate-900/40 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
+          <div className='bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200'>
+            <div className='flex justify-between items-center mb-6'>
+              <h2 className='text-xl font-bold text-slate-800 dark:text-blue-50'>Cambiar contraseña</h2>
+              <button onClick={() => setIsChangePass(false)}
+              className='text-slate-400 hover:text-slate-600 dark:hover:text-blue-200 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-[#020166] cursor-pointer'>
+                <X className='w-5 h-5'/>
+              </button>
+            </div>
+            <div className='space-y-4'>
+              <div>
+                <label className='block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1'>Contraseña Actual</label>
+                <input type='password' placeholder='........'
+                className='w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm'/>
+              </div>
+            </div>
+            <label className='block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1'>Nueva Contraseña</label>
+            <input type='password' placeholder='........'
+            className='w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm'/>
+  
+            <div className='flex gap-3 justify-end pt-4 border-t border-slate-100 dark:border-[#030188] mt-6'>
+              <button onClick={() => setIsChangePass(false)}
+              className='px-5 py-2.5 rounded-xl font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] transition-colors cursor-pointer text-sm'>Cancelar</button>
+              <button onClick={() => {alert("Debemos de actualizar la database");
+                setIsChangePass(false);}}
+                className='bg-red-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-red-700 shadow-md transition-colors cursor-pointer text-sm'>Actualizar</button>
+            </div>
           </div>
         </div>
       )}
