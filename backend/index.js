@@ -113,7 +113,7 @@ app.post('/api/tasks', async (req, res) => {
         priority: priority || 'LOW',
         dueDate: dueDate ? new Date(dueDate) : null,
         tags: tags || [],
-        fileUrl: fileUrl || null, // 🔥 Ahora sí guardamos el link de la imagen
+        fileUrl: fileUrl || null, 
         position: 0,
         userId: userId
       }
@@ -241,7 +241,83 @@ app.put('/api/users/:userId/password', async (req, res) =>{
     res.status(500).json({error: "Error al cambiar la contraseña"});
   }
 });
+app.post('/api/users/:id/score', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({ where: { id } });
 
+    const newTotal = user.tasksCompletedTotal + 1;
+    const newStreak = user.currentStreak + 1;
+    const newBest = newStreak > user.bestStreak ? newStreak : user.bestStreak;
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        tasksCompletedTotal: newTotal,
+        currentStreak: newStreak,
+        bestStreak: newBest
+      }
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error("Error al actualizar estadísticas:", error);
+    res.status(500).json({ error: "No se pudieron actualizar las rachas" });
+  }
+});
+
+// --- NUEVA RUTA: RESTAR RACHAS (EVITAR TRAMPAS) ---
+app.post('/api/users/:id/unscore', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({ where: { id } });
+
+    const newTotal = Math.max(0, user.tasksCompletedTotal - 1);
+    const newStreak = Math.max(0, user.currentStreak - 1);
+
+    const updatedUser = await prisma.user.update({
+      where: { id },
+      data: {
+        tasksCompletedTotal: newTotal,
+        currentStreak: newStreak
+      }
+    });
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error("Error al restar estadísticas:", error);
+    res.status(500).json({ error: "No se pudieron restar las rachas" });
+  }
+});
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Buscamos al usuario directamente en la base de datos
+    const user = await prisma.user.findUnique({
+      where: { id },
+      // Seleccionamos solo lo que necesitamos, sin la contraseña por seguridad
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        currentStreak: true,
+        bestStreak: true,
+        tasksCompletedTotal: true,
+        createdAt: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
+    }
+
+    res.json(user); // Devolvemos los datos más frescos
+  } catch (error) {
+    console.error("Error al obtener usuario:", error);
+    res.status(500).json({ error: "Error de servidor al obtener el usuario" });
+  }
+});
 // Iniciar el servidor
 const PORT = 3000;
 app.listen(PORT, () => {

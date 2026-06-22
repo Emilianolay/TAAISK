@@ -1,20 +1,30 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Flame, Trophy, CheckCircle, Palette, Trash2, Plus, User, Moon, X, Flag, Calendar, Image as ImageIcon, Settings, Key, LogOut} from 'lucide-react';
+import { Flame, Trophy, CheckCircle, Palette, Trash2, Plus, Moon, X, Flag, Calendar, Image as ImageIcon, LayoutList, Loader2, CheckCircle2, Settings, Key, LogOut } from 'lucide-react';
 import Customizacion from './customizacion';
 
 function Dashboard({ user, onLogout }) {
+  // --- ESTADOS DE LA UI ---
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isDark, setIsDark] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState({ id: 'blue', hex: '#4f46e5', lightHex: '#818cf8' });
+  
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [Editprofile, setIsEditProfile] = useState(false);
   const [ChangePass, setIsChangePass] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState(user?.name || '');
   const [contraVieja, setContraVieja] = useState('');
   const [contraNueva, setContraNueva] = useState('');
-  const [isDark, setIsDark] = useState(false);
-  const [primaryColor, setPrimaryColor] = useState({ id: 'blue', hex: '#4f46e5', lightHex: '#818cf8' });
 
+  // --- ESTADOS DE DATOS ---
+  const [stats, setStats] = useState({
+    currentStreak: 0,
+    bestStreak: 0,
+    tasksCompletedTotal: 0
+  });
+
+  const [weather, setWeather] = useState(null);
   const [tasks, setTasks] = useState([]); 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -26,15 +36,56 @@ function Dashboard({ user, onLogout }) {
   const [dueDate, setDueDate] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [tagsList, setTagsList] = useState([]);
-  
-  // 🔥 NUEVOS ESTADOS PARA LA IMAGEN
   const [selectedFile, setSelectedFile] = useState(null);
-  const [fileUrl, setFileUrl] = useState(''); // Guarda la URL de la imagen si ya existe
+  const [fileUrl, setFileUrl] = useState(''); 
 
+  // --- EFECTOS ---
   useEffect(() => {
     if (isDark) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [isDark]);
+
+  useEffect(() => {
+    const fetchWeather = async () => {
+      try {
+        const response = await axios.get('https://api.open-meteo.com/v1/forecast?latitude=19.4284&longitude=-99.1276&current_weather=true');
+        setWeather(response.data.current_weather);
+      } catch (error) {
+        console.error("Error clima:", error);
+      }
+    };
+    fetchWeather();
+  }, []);
+
+  const getWeatherEmoji = (code) => {
+    if (code === 0) return '☀️'; 
+    if (code >= 1 && code <= 3) return '⛅'; 
+    if (code >= 45 && code <= 48) return '🌫️'; 
+    if (code >= 51 && code <= 67) return '🌧️'; 
+    if (code >= 71 && code <= 77) return '❄️'; 
+    if (code >= 95 && code <= 99) return '⛈️'; 
+    return '🌡️'; 
+  };
+
+  // Carga de stats reales para F5
+  useEffect(() => {
+    const fetchLatestUserStats = async () => {
+      if (user && user.id) {
+        try {
+          const response = await axios.get(`http://localhost:3000/api/users/${user.id}`);
+          setStats({
+            currentStreak: response.data.currentStreak,
+            bestStreak: response.data.bestStreak,
+            tasksCompletedTotal: response.data.tasksCompletedTotal
+          });
+          setNuevoNombre(response.data.name);
+        } catch (error) {
+          console.error("Error al cargar estadísticas actualizadas:", error);
+        }
+      }
+    };
+    fetchLatestUserStats();
+  }, [user]); 
 
   useEffect(() => {
     const fetchMyTasks = async () => {
@@ -42,7 +93,7 @@ function Dashboard({ user, onLogout }) {
         const response = await axios.get(`http://localhost:3000/api/tasks/${user.id}`);
         setTasks(response.data);
       } catch (error) {
-        console.error("Error al descargar mis tareas:", error);
+        console.error("Error al descargar tareas:", error);
       }
     };
     if (user && user.id) fetchMyTasks();
@@ -51,6 +102,9 @@ function Dashboard({ user, onLogout }) {
   const todoTasks = tasks.filter(t => t.status === 'TODO');
   const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS');
   const completedTasks = tasks.filter(t => t.status === 'COMPLETED');
+
+  const totalTasks = tasks.length;
+  const progressPercentage = totalTasks === 0 ? 0 : Math.round((completedTasks.length / totalTasks) * 100);
 
   const formatDate = (dateString) => {
     if (!dateString) return null;
@@ -85,8 +139,8 @@ function Dashboard({ user, onLogout }) {
     setStatus(task.status);
     setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : '');
     setTagsList(task.tags || []);
-    setFileUrl(task.fileUrl || ''); // Cargamos la foto existente
-    setSelectedFile(null); // Limpiamos la selección de nuevos archivos
+    setFileUrl(task.fileUrl || '');
+    setSelectedFile(null);
     setIsModalOpen(true);
   };
 
@@ -103,14 +157,13 @@ function Dashboard({ user, onLogout }) {
     setIsModalOpen(false);
   };
 
-  // --- 🔥 LOGICA ACTUALIZADA PARA SUBIR LA FOTO PRIMERO ---
+  // --- LÓGICA DE API ---
   const handleSaveTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
-    let finalFileUrl = fileUrl; // Mantiene la foto vieja si no subimos una nueva
+    let finalFileUrl = fileUrl;
 
-    // Si el usuario seleccionó una foto nueva, la subimos a nuestro backend primero
     if (selectedFile) {
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -118,36 +171,23 @@ function Dashboard({ user, onLogout }) {
         const uploadResponse = await axios.post('http://localhost:3000/api/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
-        finalFileUrl = uploadResponse.data.fileUrl; // Guardamos el link de la nueva foto
+        finalFileUrl = uploadResponse.data.fileUrl; 
       } catch (error) {
         console.error("Error al subir imagen:", error);
         alert("No se pudo subir la imagen");
-        return; // Si falla la subida, cancelamos guardar la tarea
+        return; 
       }
     }
 
     try {
       if (editingTaskId) {
         const response = await axios.put(`http://localhost:3000/api/tasks/${editingTaskId}`, {
-          title: newTaskTitle,
-          description,
-          priority,
-          status,
-          dueDate: dueDate || null,
-          tags: tagsList,
-          fileUrl: finalFileUrl // Le mandamos la URL de la foto a la base de datos
+          title: newTaskTitle, description, priority, status, dueDate: dueDate || null, tags: tagsList, fileUrl: finalFileUrl
         });
         setTasks(tasks.map(t => t.id === editingTaskId ? response.data : t));
       } else {
         const response = await axios.post('http://localhost:3000/api/tasks', {
-          title: newTaskTitle,
-          description,
-          priority,
-          status,
-          dueDate: dueDate || null,
-          tags: tagsList,
-          userId: user.id,
-          fileUrl: finalFileUrl // Le mandamos la URL de la foto a la base de datos
+          title: newTaskTitle, description, priority, status, dueDate: dueDate || null, tags: tagsList, userId: user.id, fileUrl: finalFileUrl
         });
         setTasks([...tasks, response.data]); 
       }
@@ -185,12 +225,28 @@ function Dashboard({ user, onLogout }) {
       await axios.put(`http://localhost:3000/api/tasks/${draggableId}`, {
         status: destination.droppableId
       });
+
+      if (destination.droppableId === 'COMPLETED' && source.droppableId !== 'COMPLETED') {
+        const scoreResponse = await axios.post(`http://localhost:3000/api/users/${user.id}/score`);
+        setStats({
+          currentStreak: scoreResponse.data.currentStreak,
+          bestStreak: scoreResponse.data.bestStreak,
+          tasksCompletedTotal: scoreResponse.data.tasksCompletedTotal
+        });
+      }
+      else if (source.droppableId === 'COMPLETED' && destination.droppableId !== 'COMPLETED') {
+        const scoreResponse = await axios.post(`http://localhost:3000/api/users/${user.id}/unscore`);
+        setStats({
+          currentStreak: scoreResponse.data.currentStreak,
+          bestStreak: scoreResponse.data.bestStreak,
+          tasksCompletedTotal: scoreResponse.data.tasksCompletedTotal
+        });
+      }
     } catch (error) {
       console.error("Error al guardar la posición:", error);
     }
   };
 
-  //Funciones de guardar y actualizar para el perfil
   const guardarPerfil = async () => {
     if(!nuevoNombre.trim()) return alert("El nombre no puede estar vacío");
     try {
@@ -198,7 +254,7 @@ function Dashboard({ user, onLogout }) {
         nuevoNombre: nuevoNombre
       });
       alert("Perfil actualizado, vuelve a entrar para ver los cambios.");
-      setIsEditProfile(false); //Cerramosla ventana
+      setIsEditProfile(false); 
     }catch(error){
       alert("Error al actualizar el perfil");
     }
@@ -213,7 +269,7 @@ function Dashboard({ user, onLogout }) {
       });
       alert("Contraseña actualizada, se cerrará tu sesion por seguridad(:");
       setIsChangePass(false);
-      onLogout(); //Cerramos la sesion automaticamente
+      onLogout(); 
     }catch (error) {
       alert(error.response?.data?.error || "Error al cambiar contraseña");
     }
@@ -224,13 +280,20 @@ function Dashboard({ user, onLogout }) {
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* --- HEADER --- */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-40">
           <div>
             <h1 className="text-4xl font-extrabold text-[var(--c_primario)] tracking-tight drop-shadow-sm transition-colors duration-300">TaAlsk</h1>
             <p className="text-slate-500 dark:text-blue-300 font-medium mt-1">Organiza tu trabajo y mantén tu racha activa</p>
+            
+            {weather && (
+              <div className="mt-3 inline-flex items-center gap-2 bg-sky-50 dark:bg-[#020166] text-sky-700 dark:text-sky-300 px-4 py-2 rounded-xl text-sm font-bold border border-sky-200 dark:border-[#030188] shadow-sm transition-all hover:shadow-md cursor-default">
+                <span className="text-lg" title={`Código WMO: ${weather.weathercode}`}>{getWeatherEmoji(weather.weathercode)}</span>
+                Ciudad de México: {weather.temperature}°C
+              </div>
+            )}
           </div>
           
-          <div className="flex items-center gap-3 self-end md:self-auto">
+          <div className="flex items-center gap-3 self-end md:self-auto relative">
             <button onClick={() => setIsCustomizerOpen(true)} className='p-2.5 bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-xl hover:bg-slate-100 dark:hover:bg-[#020166] shadow-sm transition-all text-slate-500 dark:text-blue-200 cursor-pointer'>
               <Palette className="w-5 h-5" />
             </button>
@@ -243,106 +306,132 @@ function Dashboard({ user, onLogout }) {
             >
               <Plus className="w-4 h-4" /> Nueva Tarea
             </button>
-            <div className='relative'>
-              <button onClick={() => setIsProfileOpen(!isProfileOpen)}
-                className={`p-2.5 bg-white border border-slate-200 rounded-xl shadow-sm transition-all cursor-pointer
-                ${isProfileOpen ? 'bg-slate-100 text-[var(--c_primario)] border-[var(--c_primario)] dark:bg-[#020166] dark:text-blue-300 dark:border-[#0401AD]'
-                : 'hover:bg-slate-50 text-slate-500 dark:text-blue-200 dark:bg-[#01004A] dark:border-[#030188] dark:hover:bg-[#020166]'}`}
-                title='Mi perfil'>
-                <User className='w-5 h-5'/>
+            
+            {/* MENÚ DE USUARIO */}
+            <div className="relative">
+              <button 
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
+                className="flex items-center gap-2 p-1 bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-xl hover:shadow-md transition-all cursor-pointer" 
+                title="Menú de usuario"
+              >
+                <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-[var(--c_primario)] to-purple-400 text-white flex items-center justify-center font-black text-sm shadow-inner">
+                  {nuevoNombre ? nuevoNombre.charAt(0).toUpperCase() : 'U'}
+                </div>
               </button>
 
-              {/* cajita despegable para editar perfil*/}
-              {isProfileOpen && (
-                <div className='absolute right-0 mt-3 w-64 bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-2xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200'>
-              
-                {/*Encabezado del nombre y correo del perfil */}
-                <div className='px-4 py-3 bg-slate-50 dark:bg-[#020166] border-b border-slate-100 dark:border-[#030188]'>
-                  <p className='text-sm font-bold text-slate-800 dark:text-blue-50 truncate'>{user?.name || 'Usuario'}</p>
-                  <p className='text-xs font-medium text-slate-500 dark:text-blue-300 truncate'>{user?.email || 'correo@ejemplo.com'}</p>
-                </div>
-              
-              {/*Opciones del Menu */}
-              <div className='p-2 space-y-1'>
-                <button onClick={() => {
-                  setIsEditProfile(true); setIsProfileOpen(false);}}
-                className='w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] hover:text-[var(--c_primario)] rounded-xl transition-colors cursor-pointer'>
-                  <Settings className='w-4 h-4'/>Editar perfil
-                </button>
-                <button onClick={() => {
-                  setIsChangePass(true); setIsProfileOpen(false);}}
-                className='w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] hover:text-[var(--c_primario)] rounded-xl transition-colors cursor-pointer'>
-                  <Key className='w-4 h-4'/>Cambiar contraseña
-                </button>
-                <div className='h-px bg-slate-100 dark:bg-[#030188] my-1 mx-2'></div>
-                <button onClick={onLogout} 
-                className='w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/40 rounded-xl transition-colors cursor-pointer'>
-                  <LogOut className='w-4 h-4'/>Cerrar Sesión
-                </button> 
-              </div>
-          </div>
+              {isUserMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsUserMenuOpen(false)}></div>
+                  
+                  <div className="absolute right-0 mt-3 w-64 bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-2xl shadow-xl z-20 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-4 py-3 bg-slate-50/50 dark:bg-[#020166]/50 border-b border-slate-100 dark:border-[#030188]">
+                      <p className="text-sm font-bold text-slate-800 dark:text-blue-50 truncate">{nuevoNombre || 'Usuario'}</p>
+                      <p className="text-xs text-slate-500 dark:text-blue-300 truncate">{user?.email || 'correo@ejemplo.com'}</p>
+                    </div>
+                    <div className="p-2 space-y-1">
+                      <button 
+                        onClick={() => { setIsUserMenuOpen(false); setIsEditProfile(true); }} 
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] hover:text-[var(--c_primario)] rounded-xl transition-colors cursor-pointer"
+                      >
+                        <Settings className="w-4 h-4" /> Editar perfil
+                      </button>
+                      <button 
+                        onClick={() => { setIsUserMenuOpen(false); setIsChangePass(true); }} 
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] hover:text-[var(--c_primario)] rounded-xl transition-colors cursor-pointer"
+                      >
+                        <Key className="w-4 h-4" /> Cambiar contraseña
+                      </button>
+                      <div className="h-px bg-slate-100 dark:bg-[#030188] my-1 mx-2"></div>
+                      <button 
+                        onClick={onLogout} 
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm font-bold text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/40 rounded-xl transition-colors cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" /> Cerrar Sesión
+                      </button>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
+
           </div>
         </header>
 
         {/* --- PANEL DE ESTADÍSTICAS --- */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white dark:bg-[#01004A] p-6 rounded-2xl border border-slate-200/80 dark:border-[#030188] shadow-sm flex items-center gap-5">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-0">
+          <div className="bg-white dark:bg-[#01004A] p-6 rounded-2xl border border-slate-200/80 dark:border-[#030188] shadow-sm flex items-center gap-5 transition-all hover:-translate-y-1 hover:shadow-md">
             <div className="p-4 bg-orange-50 dark:bg-orange-500/10 rounded-2xl text-orange-500"><Flame className="w-8 h-8 fill-current" /></div>
             <div>
               <p className="text-sm font-bold text-slate-400 dark:text-blue-300 uppercase tracking-widest">Racha Actual</p>
-              <p className="text-3xl font-black text-slate-900 dark:text-white mt-0.5">{user?.currentStreak || 0} <span className="text-lg font-bold text-slate-500 dark:text-blue-300">días</span></p>
+              <p className="text-3xl font-black text-slate-900 dark:text-white mt-0.5">{stats.currentStreak} <span className="text-lg font-bold text-slate-500 dark:text-blue-300">días</span></p>
             </div>
           </div>
-          <div className="bg-white dark:bg-[#01004A] p-6 rounded-2xl border border-slate-200/80 dark:border-[#030188] shadow-sm flex items-center gap-5">
+          <div className="bg-white dark:bg-[#01004A] p-6 rounded-2xl border border-slate-200/80 dark:border-[#030188] shadow-sm flex items-center gap-5 transition-all hover:-translate-y-1 hover:shadow-md">
             <div className="p-4 bg-amber-50 dark:bg-amber-500/10 rounded-2xl text-amber-500"><Trophy className="w-8 h-8 fill-current" /></div>
             <div>
               <p className="text-sm font-bold text-slate-400 dark:text-blue-300 uppercase tracking-widest">Mejor Racha</p>
-              <p className="text-3xl font-black text-slate-900 dark:text-white mt-0.5">{user?.bestStreak || 0} <span className="text-lg font-bold text-slate-500 dark:text-blue-300">días</span></p>
+              <p className="text-3xl font-black text-slate-900 dark:text-white mt-0.5">{stats.bestStreak} <span className="text-lg font-bold text-slate-500 dark:text-blue-300">días</span></p>
             </div>
           </div>
-          <div className="bg-white dark:bg-[#01004A] p-6 rounded-2xl border border-slate-200/80 dark:border-[#030188] shadow-sm flex items-center gap-5">
+          <div className="bg-white dark:bg-[#01004A] p-6 rounded-2xl border border-slate-200/80 dark:border-[#030188] shadow-sm flex items-center gap-5 transition-all hover:-translate-y-1 hover:shadow-md">
             <div className="p-4 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl text-emerald-500"><CheckCircle className="w-8 h-8" /></div>
             <div>
               <p className="text-sm font-bold text-slate-400 dark:text-blue-300 uppercase tracking-widest">Tareas Completadas</p>
-              <p className="text-3xl font-black text-slate-900 dark:text-white mt-0.5">
-                {completedTasks.length} <span className="text-lg font-bold text-slate-500 dark:text-blue-300">total</span>
-              </p>
+              <p className="text-3xl font-black text-slate-900 dark:text-white mt-0.5">{stats.tasksCompletedTotal} <span className="text-lg font-bold text-slate-500 dark:text-blue-300">total</span></p>
             </div>
           </div>
         </section>
 
-        {/* --- TABLERO KANBAN CON DRAG AND DROP --- */}
+        {/* --- BARRA DE PROGRESO DE TAREAS --- */}
+        <div className="bg-white dark:bg-[#01004A] rounded-2xl p-5 border border-slate-200/80 dark:border-[#030188] shadow-sm flex items-center gap-4">
+          <div className="font-bold text-slate-600 dark:text-blue-200 text-sm whitespace-nowrap">Progreso del Proyecto</div>
+          <div className="w-full bg-slate-100 dark:bg-[#020166] rounded-full h-3.5 overflow-hidden border border-slate-200 dark:border-[#030188] shadow-inner">
+            <div 
+              className="bg-[var(--c_primario)] h-3.5 rounded-full transition-all duration-700 ease-out flex items-center justify-end px-2 shadow-sm" 
+              style={{ width: `${progressPercentage}%` }}
+            >
+              {progressPercentage > 5 && <span className="text-[9px] font-black text-white/90 drop-shadow-sm">{progressPercentage}%</span>}
+            </div>
+          </div>
+          <div className="font-black text-slate-800 dark:text-white text-sm whitespace-nowrap">{completedTasks.length} / {totalTasks}</div>
+        </div>
+
+        {/* --- TABLERO KANBAN ESTABLE --- */}
         <DragDropContext onDragEnd={onDragEnd}>
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start relative z-0">
             
-            {[{ id: 'TODO', title: 'Por Hacer', data: todoTasks, dragColor: 'indigo' },
-              { id: 'IN_PROGRESS', title: 'En Progreso', data: inProgressTasks, dragColor: 'amber' },
-              { id: 'COMPLETED', title: 'Completado', data: completedTasks, dragColor: 'emerald' }
+            {[{ id: 'TODO', title: 'Por Hacer', icon: <LayoutList className="w-5 h-5 text-indigo-500" />, data: todoTasks, dragColor: 'indigo', borderColor: 'border-t-indigo-500' },
+              { id: 'IN_PROGRESS', title: 'En Progreso', icon: <Loader2 className="w-5 h-5 text-amber-500 animate-spin-slow" />, data: inProgressTasks, dragColor: 'amber', borderColor: 'border-t-amber-500' },
+              { id: 'COMPLETED', title: 'Completado', icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />, data: completedTasks, dragColor: 'emerald', borderColor: 'border-t-emerald-500' }
             ].map(col => (
               <Droppable key={col.id} droppableId={col.id}>
                 {(provided, snapshot) => (
-                  <div {...provided.droppableProps} ref={provided.innerRef} className={`bg-slate-100/70 dark:bg-[#01004A] rounded-3xl p-5 border transition-all duration-500 ${snapshot.isDraggingOver ? `border-${col.dragColor}-300 dark:border-${col.dragColor}-500 bg-${col.dragColor}-50/50 dark:bg-[#020166]/80` : 'border-slate-200/50 dark:border-[#030188]'}`}>
+                  <div {...provided.droppableProps} ref={provided.innerRef} className={`bg-slate-100/70 dark:bg-[#01004A] rounded-3xl p-5 border-x border-b border-t-4 transition-all duration-500 ${col.borderColor} ${snapshot.isDraggingOver ? `border-x-${col.dragColor}-300 dark:border-x-${col.dragColor}-500 border-b-${col.dragColor}-300 dark:border-b-${col.dragColor}-500 bg-${col.dragColor}-50/50 dark:bg-[#020166]/80 shadow-inner` : 'border-x-slate-200/50 border-b-slate-200/50 dark:border-x-[#030188] dark:border-b-[#030188]'}`}>
+                    
                     <div className="flex justify-between items-center mb-5 px-1">
-                      <h3 className="font-extrabold text-slate-700 dark:text-blue-100 tracking-wide">{col.title}</h3>
+                      <div className="flex items-center gap-2">
+                        {col.icon}
+                        <h3 className="font-extrabold text-slate-700 dark:text-blue-100 tracking-wide">{col.title}</h3>
+                      </div>
                       <span className="bg-slate-200 dark:bg-[#020166] text-[var(--c_primario)] px-2.5 py-1 rounded-lg text-xs font-black shadow-sm">{col.data.length}</span>
                     </div>
+
                     <div className="space-y-4 min-h-[350px]">
-                      {col.data.length === 0 && !snapshot.isDraggingOver && col.id === 'IN_PROGRESS' && <p className="text-center text-slate-400 dark:text-blue-400 font-medium text-sm mt-12 border-2 border-dashed border-slate-200 dark:border-[#030188] rounded-xl py-8">Arrastra tareas aquí</p>}
+                      {col.data.length === 0 && !snapshot.isDraggingOver && col.id === 'IN_PROGRESS' && <p className="text-center text-slate-400 dark:text-blue-400 font-medium text-sm mt-12 border-2 border-dashed border-slate-200 dark:border-[#030188] rounded-xl py-8 flex flex-col items-center gap-2"><Loader2 className="w-6 h-6 opacity-50" /> Arrastra tareas aquí</p>}
+                      {col.data.length === 0 && !snapshot.isDraggingOver && col.id === 'COMPLETED' && <p className="text-center text-slate-400 dark:text-blue-400 font-medium text-sm mt-12 border-2 border-dashed border-slate-200 dark:border-[#030188] rounded-xl py-8 flex flex-col items-center gap-2"><CheckCircle2 className="w-6 h-6 opacity-50" /> Listo para terminar</p>}
+                      
                       {col.data.map((t, index) => (
                         <Draggable key={t.id} draggableId={t.id} index={index}>
                           {(provided, snapshot) => (
                             <div 
                               ref={provided.innerRef} {...provided.draggableProps} {...provided.dragHandleProps} 
                               onClick={() => openEditModal(t)}
-                              className={`bg-white dark:bg-[#020166] p-4 rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col group ${snapshot.isDragging ? 'shadow-lg ring-2 ring-[var(--c_primario)]/50 rotate-2 dark:border-[#0401AD]' : 'border-slate-200/80 dark:border-[#030188] hover:shadow-[0_4px_15px_rgba(6,2,213,0.4)] dark:hover:border-[#0401AD]'} ${col.id === 'COMPLETED' ? 'opacity-75' : ''}`}
+                              className={`bg-white dark:bg-[#020166] p-4 rounded-2xl shadow-sm border transition-all cursor-pointer flex flex-col group ${snapshot.isDragging ? 'shadow-xl ring-2 ring-[var(--c_primario)]/50 rotate-3 dark:border-[#0401AD] scale-105 z-50' : 'border-slate-200/80 dark:border-[#030188] hover:shadow-[0_8px_20px_rgba(6,2,213,0.15)] dark:hover:border-[#0401AD] hover:-translate-y-1'} ${col.id === 'COMPLETED' ? 'opacity-75' : ''}`}
                             >
                               
-                              {/* 🔥 NUEVO: Render de la Imagen en la Tarjeta */}
                               {t.fileUrl && (
                                 <div className="mb-3 -mx-4 -mt-4 overflow-hidden rounded-t-2xl">
-                                  <img src={t.fileUrl} alt="Adjunto de tarea" className={`w-full h-32 object-cover ${col.id === 'COMPLETED' ? 'opacity-60 grayscale' : ''}`} />
+                                  <img src={t.fileUrl} alt="Adjunto" className={`w-full h-32 object-cover transition-all duration-300 group-hover:scale-105 ${col.id === 'COMPLETED' ? 'opacity-60 grayscale' : ''}`} />
                                 </div>
                               )}
 
@@ -354,7 +443,7 @@ function Dashboard({ user, onLogout }) {
                                     </span>
                                   )}
                                 </div>
-                                <button onClick={(e) => handleDeleteTask(t.id, e)} className="text-slate-300 hover:text-red-500 dark:text-blue-300/40 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1">
+                                <button onClick={(e) => handleDeleteTask(t.id, e)} className="text-slate-300 hover:text-red-500 dark:text-blue-300/40 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all p-1 bg-white dark:bg-[#020166] rounded-md shadow-sm">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
@@ -393,119 +482,30 @@ function Dashboard({ user, onLogout }) {
         <Customizacion isDark={isDark} toggleDark={() => setIsDark(!isDark)} primaryColor={primaryColor} setPrimaryColor={setPrimaryColor} onClose={() => setIsCustomizerOpen(false)} />
       )}
 
-      {/* --- MODAL --- */}
+      {/* --- MODALES --- */}
+
+      {/* 1. Modal de Tareas */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/40 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
-            
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-blue-50">
-                {editingTaskId ? "Editar Tarea" : "Crear nueva tarea"}
-              </h2>
-              <button onClick={resetModal} className="text-slate-400 hover:text-slate-600 dark:hover:text-blue-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-[#020166] cursor-pointer">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
+          <div className="bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200 relative z-50">
+            <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-slate-800 dark:text-blue-50">{editingTaskId ? "Editar Tarea" : "Crear nueva tarea"}</h2><button onClick={resetModal} className="text-slate-400 hover:text-slate-600 dark:hover:text-blue-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-[#020166] cursor-pointer"><X className="w-5 h-5" /></button></div>
             <form onSubmit={handleSaveTask} className="space-y-4">
-              
-              {/* 🔥 NUEVO: PREVISUALIZACIÓN DE IMAGEN */}
-              {(fileUrl || selectedFile) && (
-                <div className="relative w-full h-32 mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-[#030188]">
-                  <img 
-                    src={selectedFile ? URL.createObjectURL(selectedFile) : fileUrl} 
-                    alt="Preview" 
-                    className="w-full h-full object-cover"
-                  />
-                  <button 
-                    type="button" 
-                    onClick={() => { setFileUrl(''); setSelectedFile(null); }}
-                    className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-lg backdrop-blur-sm"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Título</label>
-                <input type="text" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Avance de Proyecto" className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm" required autoFocus />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Descripción</label>
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Objetivos" className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm resize-none min-h-[70px]" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Prioridad</label>
-                  <select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-3 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-700 dark:text-blue-100 text-sm cursor-pointer">
-                    <option value="LOW">Baja</option>
-                    <option value="MEDIUM">Media</option>
-                    <option value="HIGH">Alta</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Estado</label>
-                  <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-3 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-700 dark:text-blue-100 text-sm cursor-pointer">
-                    <option value="TODO">Por Hacer</option>
-                    <option value="IN_PROGRESS">En Progreso</option>
-                    <option value="COMPLETED">Completado</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Fecha límite</label>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-3 py-2 outline-none focus:border-[var(--c_primario)] text-slate-700 dark:text-blue-100 text-sm cursor-pointer" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Adjuntar Imagen</label>
-                  {/* BOTÓN REAL PARA SUBIR ARCHIVOS */}
-                  <label className="w-full bg-indigo-50 hover:bg-indigo-100 dark:bg-[#020166] dark:hover:bg-[#030188] border border-indigo-200 dark:border-[#030188] rounded-xl px-2 py-2 text-xs font-bold text-[var(--c_primario)] dark:text-blue-300 flex items-center justify-center gap-2 cursor-pointer transition-colors">
-                    <ImageIcon className="w-4 h-4" /> 
-                    {selectedFile ? 'Cambiar imagen' : 'Seleccionar archivo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => setSelectedFile(e.target.files[0])} />
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Etiquetas</label>
-                <div className="flex gap-2">
-                  <input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="Ej. Diseño, urgente..." className="flex-1 bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm" />
-                  <button onClick={handleAddTag} className="bg-slate-100 dark:bg-[#020166] hover:bg-slate-200 dark:hover:bg-[#030188] border border-slate-200 dark:border-[#030188] text-slate-700 dark:text-blue-100 font-bold px-4 rounded-xl text-xs transition-colors cursor-pointer">Añadir</button>
-                </div>
-                {tagsList.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {tagsList.map((tag, index) => (
-                      <span key={index} className="inline-flex items-center gap-1 bg-indigo-50 dark:bg-[#020166] border border-indigo-100 dark:border-[#030188] text-indigo-600 dark:text-blue-300 px-2 py-0.5 rounded-lg text-xs font-semibold">
-                        #{tag}
-                        <X onClick={() => handleRemoveTag(tag)} className="w-3 h-3 cursor-pointer hover:text-red-500" />
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3 justify-end pt-2 border-t border-slate-100 dark:border-[#030188]">
-                <button type="button" onClick={resetModal} className="px-5 py-2.5 rounded-xl font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] transition-colors cursor-pointer text-sm">Cancelar</button>
-                <button type="submit" className="bg-[var(--c_primario)] text-white px-5 py-2.5 rounded-xl font-bold hover:opacity-90 shadow-md transition-colors cursor-pointer text-sm">
-                  {editingTaskId ? "Guardar Cambios" : "Crear Tarea"}
-                </button>
-              </div>
+              {(fileUrl || selectedFile) && (<div className="relative w-full h-32 mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-[#030188] shadow-inner"><img src={selectedFile ? URL.createObjectURL(selectedFile) : fileUrl} alt="Preview" className="w-full h-full object-cover"/><button type="button" onClick={() => { setFileUrl(''); setSelectedFile(null); }} className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-lg backdrop-blur-sm"><X className="w-4 h-4" /></button></div>)}
+              <div><label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Título</label><input type="text" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} placeholder="Avance de Proyecto" className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm" required autoFocus /></div>
+              <div><label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Descripción</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Objetivos" className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm resize-none min-h-[70px]" /></div>
+              <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Prioridad</label><select value={priority} onChange={(e) => setPriority(e.target.value)} className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-3 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-700 dark:text-blue-100 text-sm cursor-pointer"><option value="LOW">Baja</option><option value="MEDIUM">Media</option><option value="HIGH">Alta</option></select></div><div><label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Estado</label><select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-3 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-700 dark:text-blue-100 text-sm cursor-pointer"><option value="TODO">Por Hacer</option><option value="IN_PROGRESS">En Progreso</option><option value="COMPLETED">Completado</option></select></div></div>
+              <div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Fecha límite</label><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-3 py-2 outline-none focus:border-[var(--c_primario)] text-slate-700 dark:text-blue-100 text-sm cursor-pointer" /></div><div><label className="w-full bg-indigo-50 hover:bg-indigo-100 dark:bg-[#020166] dark:hover:bg-[#030188] border border-indigo-200 dark:border-[#030188] rounded-xl px-2 py-2 text-xs font-bold text-[var(--c_primario)] dark:text-blue-300 flex items-center justify-center gap-2 cursor-pointer transition-colors border-dashed border-2"><ImageIcon className="w-4 h-4" /> {selectedFile ? 'Cambiar' : 'Seleccionar'}<input type="file" accept="image/*" className="hidden" onChange={(e) => setSelectedFile(e.target.files[0])} /></label></div></div>
+              <div><label className="block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1">Etiquetas</label><div className="flex gap-2"><input type="text" value={tagInput} onChange={(e) => setTagInput(e.target.value)} placeholder="Ej. Diseño..." className="flex-1 bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm" /><button onClick={handleAddTag} className="bg-slate-100 dark:bg-[#020166] hover:bg-slate-200 dark:hover:bg-[#030188] border border-slate-200 dark:border-[#030188] text-slate-700 dark:text-blue-100 font-bold px-4 rounded-xl text-xs transition-colors cursor-pointer">Añadir</button></div>{tagsList.length > 0 && (<div className="flex flex-wrap gap-1.5 mt-2">{tagsList.map((tag, index) => (<span key={index} className="inline-flex items-center gap-1 bg-indigo-50 dark:bg-[#020166] border border-indigo-100 dark:border-[#030188] text-indigo-600 dark:text-blue-300 px-2 py-0.5 rounded-lg text-xs font-semibold">#{tag}<X onClick={() => handleRemoveTag(tag)} className="w-3 h-3 cursor-pointer hover:text-red-500" /></span>))}</div>)}</div>
+              <div className="flex gap-3 justify-end pt-2 border-t border-slate-100 dark:border-[#030188]"><button type="button" onClick={resetModal} className="px-5 py-2.5 rounded-xl font-semibold text-slate-600 dark:text-blue-200 hover:bg-slate-100 dark:hover:bg-[#020166] transition-colors cursor-pointer text-sm">Cancelar</button><button type="submit" className="bg-[var(--c_primario)] text-white px-5 py-2.5 rounded-xl font-bold hover:opacity-90 shadow-md transition-colors cursor-pointer text-sm">{editingTaskId ? "Guardar" : "Crear"}</button></div>
             </form>
-
           </div>
         </div>
       )}
 
-      {/*Pantalla para editar el perfil*/}
+      {/* 2. Modal de Editar Perfil */}
       {Editprofile && (
         <div className='fixed inset-0 bg-slate-900/40 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-          <div className='bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200'>
+          <div className='bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200 relative z-50'>
             <div className='flex justify-between items-center mb-6'>
               <h2 className="text-xl font-bold text-slate-800 dark:text-blue-50">Editar Perfil</h2>
               <button onClick={() => setIsEditProfile(false)}
@@ -513,8 +513,8 @@ function Dashboard({ user, onLogout }) {
                 <X className='w-5 h-5'/>
               </button>
             </div>
-            <div>
-              <label className='block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1'>Nombre</label>
+            <div className="space-y-3">
+              <label className='block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider'>Nombre Completo</label>
               <input type='text' value = {nuevoNombre} onChange={(e) => setNuevoNombre(e.target.value)}
               className='w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm'/>
             </div>
@@ -528,10 +528,10 @@ function Dashboard({ user, onLogout }) {
         </div>
       )}
 
-      {/*Cambiar contraseña*/}
+      {/* 3. Modal de Cambiar contraseña */}
       {ChangePass && (
         <div className='fixed inset-0 bg-slate-900/40 dark:bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4'>
-          <div className='bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200'>
+          <div className='bg-white dark:bg-[#01004A] border border-slate-200 dark:border-[#030188] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95 duration-200 relative z-50'>
             <div className='flex justify-between items-center mb-6'>
               <h2 className='text-xl font-bold text-slate-800 dark:text-blue-50'>Cambiar contraseña</h2>
               <button onClick={() => setIsChangePass(false)}
@@ -545,10 +545,12 @@ function Dashboard({ user, onLogout }) {
                 <input type='password' value={contraVieja} onChange={(e) => setContraVieja(e.target.value)} placeholder='........'
                 className='w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm'/>
               </div>
+              <div>
+                <label className='block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1'>Nueva Contraseña</label>
+                <input type='password' value={contraNueva} onChange={(e) => setContraNueva(e.target.value)} placeholder='........'
+                className='w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm'/>
+              </div>
             </div>
-            <label className='block text-xs font-bold text-slate-600 dark:text-blue-200 uppercase tracking-wider mb-1'>Nueva Contraseña</label>
-            <input type='password' value={contraNueva} onChange={(e) => setContraNueva(e.target.value)} placeholder='........'
-            className='w-full bg-slate-50 dark:bg-[#020166] border border-slate-200 dark:border-[#030188] rounded-xl px-4 py-2.5 outline-none focus:border-[var(--c_primario)] text-slate-800 dark:text-blue-50 text-sm'/>
   
             <div className='flex gap-3 justify-end pt-4 border-t border-slate-100 dark:border-[#030188] mt-6'>
               <button onClick={() => setIsChangePass(false)}
