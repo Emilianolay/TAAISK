@@ -6,57 +6,57 @@ import { Zap, Palette, RefreshCw, LayoutTemplate } from 'lucide-react';
 function App() {
   const [isLogin, setIsLogin] = useState(true);
   
-  const [activeUser, setActiveUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
+  const [usuarioActivo, setUsuarioActivo] = useState(() => {
+    const usuarioGuardado = localStorage.getItem('usuario');
+    return usuarioGuardado ? JSON.parse(usuarioGuardado) : null;
   });
   
   // Estados del formulario
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
+  const [nombre, setNombre] = useState('');
+  const [correo, setCorreo] = useState('');
+  const [contrasena, setContrasena] = useState('');
+  const [mensaje, setMensaje] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
+    setMensaje('');
     
     try {
       if (isLogin) {
-        const response = await axios.post('http://localhost:3000/api/login', { email, password });
+        const response = await axios.post('http://localhost:3000/api/login', { correo, contrasena });
         
         // Guardamos el token de seguridad
         localStorage.setItem('token', response.data.token);
         
-        // 🔥 CAMBIO 2: Guardamos todos los datos del usuario en el navegador
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+        // Guardamos todos los datos del usuario en el navegador
+        localStorage.setItem('usuario', JSON.stringify(response.data.usuario));
         
-        setMessage("✅ " + response.data.message);
-        setActiveUser(response.data.user);
+        setMensaje("✅ " + response.data.message);
+        setUsuarioActivo(response.data.usuario);
 
       } else {
-        const response = await axios.post('http://localhost:3000/api/register', { name, email, password });
-        setMessage("🎉 " + response.data.message);
-        setName('');
-        setEmail('');
-        setPassword('');
+        const response = await axios.post('http://localhost:3000/api/registro', { nombre, correo, contrasena });
+        setMensaje("🎉 " + response.data.message);
+        setNombre('');
+        setCorreo('');
+        setContrasena('');
         setTimeout(() => setIsLogin(true), 2000);
       }
     } catch (error) {
-      setMessage("❌ " + (error.response?.data?.error || "Error de conexión"));
+      setMensaje("❌ " + (error.response?.data?.error || "Error de conexión"));
     }
   };
 
   const handleLogout = () => {
-    // 🔥 CAMBIO 3: Limpiamos absolutamente todo al cerrar sesión
+    // Limpiamos absolutamente todo al cerrar sesión
     localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setActiveUser(null);
+    localStorage.removeItem('usuario');
+    setUsuarioActivo(null);
   };
 
   // CONDICIONAL: Si el usuario ya inició sesión, mostramos el Dashboard
-  if (activeUser) {
-    return <Dashboard user={activeUser} onLogout={handleLogout} />;
+  if (usuarioActivo) {
+    return <Dashboard usuario={usuarioActivo} onLogout={handleLogout} />;
   }
 
   // --- INTERFAZ DE LOGIN Y REGISTRO ---
@@ -104,19 +104,19 @@ function App() {
             {isLogin ? 'Inicia sesión para continuar' : 'Crea una cuenta para comenzar'}
           </p>
 
-          {message && (
+          {mensaje && (
             <div className={`mb-4 p-3 text-sm rounded-lg text-center font-medium ${
-              message.includes('❌') ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'
+              mensaje.includes('❌') ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'
             }`}>
-              {message}
+              {mensaje}
             </div>
           )}
 
           <div className="bg-slate-100 p-1 rounded-xl flex mb-6">
-            <button type="button" onClick={() => { setIsLogin(true); setMessage(''); }} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${isLogin ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}>
+            <button type="button" onClick={() => { setIsLogin(true); setMensaje(''); }} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${isLogin ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}>
               Iniciar Sesión
             </button>
-            <button type="button" onClick={() => { setIsLogin(false); setMessage(''); }} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${!isLogin ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}>
+            <button type="button" onClick={() => { setIsLogin(false); setMensaje(''); }} className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${!isLogin ? 'bg-white shadow-sm text-slate-800' : 'text-slate-500 hover:text-slate-800'}`}>
               Registrarse
             </button>
           </div>
@@ -125,18 +125,18 @@ function App() {
             {!isLogin && (
               <div>
                 <label className="block text-sm font-bold text-slate-800 mb-1">Nombre</label>
-                <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Tu nombre" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 text-slate-800" required />
+                <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Tu nombre" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 text-slate-800" required />
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-bold text-slate-800 mb-1">Email</label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 text-slate-800" required />
+              <label className="block text-sm font-bold text-slate-800 mb-1">Correo Electrónico</label>
+              <input type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} placeholder="tu@correo.com" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 text-slate-800" required />
             </div>
 
             <div>
               <label className="block text-sm font-bold text-slate-800 mb-1">Contraseña</label>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 text-slate-800" required />
+              <input type="password" value={contrasena} onChange={(e) => setContrasena(e.target.value)} placeholder="••••••••" className="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:border-indigo-500 text-slate-800" required />
             </div>
 
             <button type="submit" className="w-full bg-slate-900 text-white font-semibold rounded-lg px-4 py-3 mt-4 hover:bg-slate-800 transition-colors cursor-pointer">
