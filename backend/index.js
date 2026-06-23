@@ -114,7 +114,7 @@ app.post('/api/tareas', async (req, res) => {
         prioridad: prioridad || 'BAJA',
         fechaLimite: fechaLimite ? new Date(fechaLimite) : null,
         etiquetas: etiquetas || [],
-        archivoUrl: archivoUrl || null, 
+        archivoUrl: archivoUrl || null,
         posicion: 0,
         usuarioId: usuarioId
       }
@@ -160,7 +160,7 @@ app.put('/api/tareas/:tareaId', async (req, res) => {
     if (estado !== undefined) datosAActualizar.estado = estado;
     if (prioridad !== undefined) datosAActualizar.prioridad = prioridad;
     if (etiquetas !== undefined) datosAActualizar.etiquetas = etiquetas;
-    if (archivoUrl !== undefined) datosAActualizar.archivoUrl = archivoUrl; 
+    if (archivoUrl !== undefined) datosAActualizar.archivoUrl = archivoUrl;
     if (fechaLimite !== undefined) {
       datosAActualizar.fechaLimite = fechaLimite ? new Date(fechaLimite) : null;
     }
@@ -181,7 +181,7 @@ app.put('/api/tareas/:tareaId', async (req, res) => {
 app.delete('/api/tareas/:tareaId', async (req, res) => {
   try {
     const { tareaId } = req.params;
-    
+
     await prisma.tarea.delete({
       where: { id: tareaId }
     });
@@ -196,37 +196,37 @@ app.delete('/api/tareas/:tareaId', async (req, res) => {
 //Editamos el perfil del usuario
 //Para su nombre 
 app.put('/api/usuarios/:usuarioId/perfil', async (req, res) => {
-  try{
-    const {usuarioId} = req.params;
-    const {nuevoNombre} = req.body;
+  try {
+    const { usuarioId } = req.params;
+    const { nuevoNombre } = req.body;
 
     const usActualizado = await prisma.usuario.update({
-      where: {id: usuarioId},
-      data: {nombre: nuevoNombre} 
+      where: { id: usuarioId },
+      data: { nombre: nuevoNombre }
     });
 
     res.json(usActualizado);
-  }catch(error){
+  } catch (error) {
     console.error("Error al actualizar el perfil:", error);
-    res.status(500).json({ error: "No se actualizo el perfil"});
+    res.status(500).json({ error: "No se actualizo el perfil" });
   }
 });
 
 //Para su contraseña
-app.put('/api/usuarios/:usuarioId/contrasena', async (req, res) =>{
-  try{
-    const {usuarioId} = req.params;
-    const {contraVieja, contraNueva} = req.body;
+app.put('/api/usuarios/:usuarioId/contrasena', async (req, res) => {
+  try {
+    const { usuarioId } = req.params;
+    const { contraVieja, contraNueva } = req.body;
     //Aqui buscamos el usuario
-    const usEncontrado = await prisma.usuario.findUnique({ where: { id: usuarioId}});
-    if(!usEncontrado){
-      return res.status(404).json({ error: "Usuario no encontrado"});
+    const usEncontrado = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+    if (!usEncontrado) {
+      return res.status(404).json({ error: "Usuario no encontrado" });
     }
 
     //Revisamos si la contra vieja esta bien
-    const contraValida = await bcrypt.compare(contraVieja,usEncontrado.contrasena);
-    if(!contraValida){
-      return res.status(401).json({error: "La contraseña actual es incorrecta"});
+    const contraValida = await bcrypt.compare(contraVieja, usEncontrado.contrasena);
+    if (!contraValida) {
+      return res.status(401).json({ error: "La contraseña actual es incorrecta" });
     }
 
     // Encriptamos la contra nueva para que sea segura
@@ -234,13 +234,13 @@ app.put('/api/usuarios/:usuarioId/contrasena', async (req, res) =>{
 
     //La volvemos a guardar en la base
     await prisma.usuario.update({
-      where: {id: usuarioId},
-      data: {contrasena: encrNuevaContra}
+      where: { id: usuarioId },
+      data: { contrasena: encrNuevaContra }
     });
-    res.json({ message: "Contraseña actualizada con exito"});
-  }catch (error){
+    res.json({ message: "Contraseña actualizada con exito" });
+  } catch (error) {
     console.error("Error al cambiar contraseña:", error);
-    res.status(500).json({error: "Error al cambiar la contraseña"});
+    res.status(500).json({ error: "Error al cambiar la contraseña" });
   }
 });
 
@@ -296,7 +296,7 @@ app.post('/api/usuarios/:id/restar-racha', async (req, res) => {
 app.get('/api/usuarios/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Buscamos al usuario directamente en la base de datos
     const usuario = await prisma.usuario.findUnique({
       where: { id },
@@ -320,6 +320,26 @@ app.get('/api/usuarios/:id', async (req, res) => {
   } catch (error) {
     console.error("Error al obtener usuario:", error);
     res.status(500).json({ error: "Error de servidor al obtener el usuario" });
+  }
+});
+
+app.delete('/api/usuarios/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Borrar tareas antes
+    await prisma.tarea.deleteMany({
+      where: { usuarioId: id }
+    });
+
+    await prisma.usuario.delete({
+      where: { id }
+    });
+
+    res.json({ message: "Usuario y sus tareas eliminados correctamente" });
+  } catch (error) {
+    console.error("Error al eliminar el usuario:", error);
+    res.status(500).json({ error: "No se pudo eliminar el usuario" });
   }
 });
 

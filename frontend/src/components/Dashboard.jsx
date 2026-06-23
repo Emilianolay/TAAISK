@@ -281,6 +281,19 @@ function Dashboard({ usuario, onLogout }) {
     }
   };
 
+  const eliminarCuenta = async () => {
+    if (window.confirm("¿Estás seguro de que deseas eliminar tu cuenta permanentemente? Todas tus tareas se perderán. Esta acción no se puede deshacer.")) {
+      try {
+        await axios.delete(`http://localhost:3000/api/usuarios/${usuario.id}`);
+        alert("Cuenta eliminada correctamente.");
+        onLogout();
+      } catch (error) {
+        console.error("Error al eliminar cuenta:", error);
+        alert("Hubo un error al eliminar tu cuenta.");
+      }
+    }
+  };
+
   return (
     <div className="fondo_app">
       <div className="contenedor_principal">
@@ -348,6 +361,12 @@ function Dashboard({ usuario, onLogout }) {
                         <Key className="w-4 h-4" /> Cambiar contraseña
                       </button>
                       <div className="h-px bg-slate-100 dark:bg-[#030188] my-1 mx-2"></div>
+                      <button 
+                        onClick={() => { setIsUserMenuOpen(false); eliminarCuenta(); }} 
+                        className="menu_opcion text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" /> Eliminar cuenta
+                      </button>
                       <button 
                         onClick={onLogout} 
                         className="menu_opcion_salir"
